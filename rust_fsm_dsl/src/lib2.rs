@@ -7,7 +7,7 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
-use syn::{parse_macro_input, Ident};
+use syn::{parse_macro_input, Ident, Expr};
 
 mod parser;
 
@@ -16,7 +16,7 @@ mod parser;
 struct Transition<'a> {
     initial_state: &'a Ident,
     input_value: &'a Ident,
-    trans_fn: & 'a Ident,
+    trans_fn: & 'a Expr,
     final_state: &'a Ident,
     output: &'a Option<Ident>,
     err_state: &'a Ident,
@@ -24,10 +24,10 @@ struct Transition<'a> {
 }
 
 #[proc_macro]
+/// Produce a state machine definition from the provided `rust-fmt` DSL
+/// description.
 pub fn state_machine(tokens: TokenStream) -> TokenStream {
-    // parse macro into tokens
     let input = parse_macro_input!(tokens as parser::StateMachineDef);
-    // eprintln!("{:?}", input);
 
     let derives = if let Some(derives) = input.derives {
         quote! { #[derive(#(#derives,)*)] }
@@ -68,7 +68,6 @@ pub fn state_machine(tokens: TokenStream) -> TokenStream {
     let mut trans_fns = HashSet::new();
 
     states.insert(&input.initial_state);
-    //trans_fns.insert(&input.initial_state);
 
     for transition in transitions.iter() {
         states.insert(&transition.initial_state);
@@ -123,7 +122,7 @@ pub fn state_machine(tokens: TokenStream) -> TokenStream {
         };
 
         let outputs_type = quote! { #outputs_type_name };
-/*
+
         let mut output_cases = vec![];
         for transition in transitions.iter() {
             if let Some(output_value) = &transition.output {
@@ -136,7 +135,7 @@ pub fn state_machine(tokens: TokenStream) -> TokenStream {
                 });
             }
         }
-*/
+
         (outputs_repr, outputs_type)
     } else {
         (quote! {}, quote! { () })
@@ -169,8 +168,12 @@ pub fn state_machine(tokens: TokenStream) -> TokenStream {
             // fn transition(state: &Self::State, input: &Self::Input) -> Option<(Self::State)> {
                 match (state, input) {
                     #(#transition_cases)*
-                    _ => None, 
+                    _ => None,
                 }
+            }
+
+            fn output(state: &Self::State, input: &Self::Input) -> Option<Self::Output> {
+                #output_impl
             }
         }
     };

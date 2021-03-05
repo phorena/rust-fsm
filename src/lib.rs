@@ -147,26 +147,36 @@ pub trait StateMachineImpl {
     // allow since there is usually no interior mutability because states are enums
     #[allow(clippy::declare_interior_mutable_const)]
     const INITIAL_STATE: Self::State;
-    /// The transition fuction that outputs a new state based on the current
+    /// The transition function that outputs a new state based on the current
     /// state and the provided input. Outputs `None` when there is no transition
     /// for a given combination of the input and the state.
-    fn transition(state: &Self::State, input: &Self::Input) -> Option<Self::State>;
-    /// The output function that outputs some value from the output alphabet
-    /// based on the current state and the given input. Outputs `None` when
-    /// there is no output for a given combination of the input and the state.
-    fn output(state: &Self::State, input: &Self::Input) -> Option<Self::Output>;
+     /// fn transition(state: &Self::State, input: &Self::Input) -> Option<Self::State>;
+     fn transition(state: &Self::State, input: &Self::Input) -> Option<(Self::State, Self::Output)>;
 }
 
 /// A convenience wrapper around the `StateMachine` trait that encapsulates the
 /// state and transition and output function calls.
 pub struct StateMachine<T: StateMachineImpl> {
     state: T::State,
+// TODO
+//    Shift from CircuitBreakerOutput::Bye to CircuitBreaker::Output::Bye
+//    pub output: T::Output,
+//    pub input: T::Input,
 }
 
 #[derive(Debug, Clone)]
 /// An error type that represents that the state transition is impossible given
 /// the current combination of state and input.
 pub struct TransitionImpossibleError;
+
+
+// result<> enum for experation error
+#[derive(Debug)]
+pub enum FSMError {
+    ImpossibleTransition(String),
+    TimestampChanged(String),
+}
+
 
 impl<T> StateMachine<T>
 where
@@ -190,13 +200,24 @@ where
     pub fn consume(
         &mut self,
         input: &T::Input,
-    ) -> Result<Option<T::Output>, TransitionImpossibleError> {
-        if let Some(state) = T::transition(&self.state, input) {
-            let output = T::output(&self.state, input);
+    ) -> Result<Option<T::Output>, FSMError> {
+        // get timestamp
+        if let Some(result) = T::transition(&self.state, input) {
+            // TODO
+            // if the timestamp didn't change
+            // lock state, change state, set new timestamp
+            let (state, output) = result;
             self.state = state;
-            Ok(output)
+            Ok(Some(output))
+            // unlock state 
+            // else // timestamp changed
+            // return err (old TS, new TS, state, input)
         } else {
-            Err(TransitionImpossibleError)
+            // no match for (state, input) pair
+            // valid input but no matching state
+            let err_string = format!("check state and input pair.");
+            // let err_string = format!("{:#?}:{:#?}", self.state, input);
+            Err(FSMError::ImpossibleTransition(err_string))
         }
     }
 

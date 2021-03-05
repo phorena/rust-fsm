@@ -1,7 +1,8 @@
 use syn::{
     braced, bracketed, parenthesized,
     parse::{Error, Parse, ParseStream, Result},
-    token::{Bracket, Paren},
+    // token::{Bracket, Paren},
+    token::{Bracket},
     Ident, Token, Visibility,
 };
 
@@ -34,20 +35,31 @@ impl Into<Option<Ident>> for Output {
 /// trait is implemented for the compact form.
 pub struct TransitionEntry {
     pub input_value: Ident,
+    pub trans_fn: Ident,
     pub final_state: Ident,
     pub output: Option<Ident>,
+    pub err_state: Ident,
+    pub err_output: Option<Ident>,
 }
 
 impl Parse for TransitionEntry {
     fn parse(input: ParseStream) -> Result<Self> {
         let input_value = input.parse()?;
         input.parse::<Token![=>]>()?;
+        let trans_fn = input.parse()?;
+        input.parse::<Token![?]>()?;
         let final_state = input.parse()?;
         let output = input.parse::<Output>()?.into();
+        input.parse::<Token![:]>()?;
+        let err_state = input.parse()?;
+        let err_output = input.parse::<Output>()?.into();
         Ok(Self {
             input_value,
+            trans_fn,
             final_state,
             output,
+            err_state,
+            err_output,
         })
     }
 }
@@ -63,7 +75,7 @@ impl Parse for TransitionDef {
         let initial_state = input.parse()?;
         // Parse the transition in the simple format
         // InitialState(Input) => ResultState [Output]
-        let transitions = if input.lookahead1().peek(Paren) {
+        let transitions = /*if input.lookahead1().peek(Paren) {
             let input_content;
             parenthesized!(input_content in input);
             let input_value = input_content.parse()?;
@@ -73,10 +85,13 @@ impl Parse for TransitionDef {
 
             vec![TransitionEntry {
                 input_value,
+                trans_fn,
                 final_state,
                 output,
+                err_state,
+                err_output,
             }]
-        } else {
+        } else*/ {
             // Parse the transition in the compact format
             // InitialState => {
             //     Input1 => State1,
